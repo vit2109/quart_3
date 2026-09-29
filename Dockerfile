@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     libpq-dev \
+    fonts-dejavu-core \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

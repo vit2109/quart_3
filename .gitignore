@@ -6,10 +6,10 @@ build/
 dist/
 wheels/
 *.egg-info
-*.docx
-*.xlsx
-*.txt
-*.json
+/*.docx
+/*.xlsx
+/*.txt
+/*.json
 
 # Virtual environments
 .venv
