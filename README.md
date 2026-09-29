@@ -81,3 +81,4 @@ uv run pytest -q
 
 Реализованы bcrypt-хеширование паролей, JWT access/refresh-токены и роли `viewer`, `analyst`, `admin`. NLQ-планы и пользовательский SQL валидируются до выполнения. В текущем SPA токены хранятся в `localStorage`; для публичного промышленного развёртывания рекомендуется перенести refresh-токен в httpOnly-cookie и настроить CSP на внешнем шлюзе.
 # quart_3
+# quart_3
