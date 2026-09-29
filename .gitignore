@@ -16,11 +16,12 @@ wheels/
 .env
 
 # Uploads & local data
-uploads/
-data/
-reports/
-chroma_db/
-knowledge/
-logs/
-models/
-.docx_qa/
+
+/uploads/
+/data/
+/reports/
+/chroma_db/
+/knowledge/
+/logs/
+/models/
+/.docx_qa/

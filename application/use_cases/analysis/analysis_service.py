@@ -3,7 +3,6 @@
 Поддерживаемые методы: описательная статистика, корреляции Pearson/Spearman,
 поиск аномалий по Z-score, базовый прогноз временного ряда, KPI-агрегации.
 """
-
 from __future__ import annotations
 
 import asyncio
