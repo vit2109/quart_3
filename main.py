@@ -1,8 +1,16 @@
 """Точка входа FastAPI: API аналитики, статика SPA, lifespan и обработка ошибок."""
 
-import core.env_bootstrap  # noqa: F401 — до torch/transformers
-
+import os
 from pathlib import Path
+import sys
+
+# В frozen-сборке конфигурация и runtime-данные находятся рядом с EXE, а не во
+# временном каталоге распаковки PyInstaller и не в случайной рабочей директории.
+if getattr(sys, "frozen", False):
+    os.chdir(Path(sys.executable).resolve().parent)
+
+import core.env_bootstrap  # noqa: E402,F401 — до torch/transformers
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -18,7 +26,8 @@ from core.db_state import init_database
 from core.scheduler import start_scheduler, stop_scheduler
 from api.v1.endpoints import auth, datasets, etl, analysis, reports, export_data, knowledge, jobs, metadata
 
-STATIC_DIR = Path(__file__).parent / "static"
+APP_BUNDLE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+STATIC_DIR = APP_BUNDLE_DIR / "static"
 
 # Настройка логирования
 logger = setup_logging()
@@ -161,18 +170,21 @@ _RELOAD_EXCLUDES = [
 ]
 
 if __name__ == "__main__":
+    import multiprocessing
     import uvicorn
 
+    multiprocessing.freeze_support()
     use_reload = bool(settings.DEBUG and settings.UVICORN_RELOAD)
     if settings.DEBUG and not settings.UVICORN_RELOAD:
         logger.info(
             "Uvicorn reload disabled (UVICORN_RELOAD=false). "
             "Data dirs are excluded when reload is enabled."
         )
+    frozen = bool(getattr(sys, "frozen", False))
     uvicorn.run(
-        "main:app",
+        app if frozen else "main:app",
         host="0.0.0.0",
         port=8001,
-        reload=use_reload,
-        reload_excludes=_RELOAD_EXCLUDES if use_reload else None,
+        reload=use_reload and not frozen,
+        reload_excludes=_RELOAD_EXCLUDES if use_reload and not frozen else None,
     )

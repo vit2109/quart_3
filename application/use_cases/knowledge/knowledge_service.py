@@ -100,7 +100,9 @@ class KnowledgeService:
     def _index_document_by_id(
         self, document_id: str, collection: str
     ) -> Dict[str, Any]:
-        if settings.KNOWLEDGE_USE_SUBPROCESS:
+        # В one-file EXE sys.executable указывает на само приложение,
+        # поэтому `exe -m index_worker` недоступен.
+        if settings.KNOWLEDGE_USE_SUBPROCESS and not getattr(sys, "frozen", False):
             return self._index_via_subprocess(document_id, collection)
         return self.index_document_inprocess(document_id, collection=collection)
 

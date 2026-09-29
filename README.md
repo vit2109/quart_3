@@ -56,8 +56,8 @@ uv sync --extra dev
 uv run python main.py
 ```
 
-Интерфейс: `http://localhost:8000`  
-OpenAPI в режиме разработки: `http://localhost:8000/docs`
+Интерфейс: `http://localhost:8001`
+OpenAPI в режиме разработки: `http://localhost:8001/docs`
 
 Запуск через Docker:
 
@@ -72,6 +72,17 @@ uv run pytest -q
 ```
 
 Тесты покрывают API, аутентификацию, ETL, анализ, NLQ и SQL, отчёты, хранилища, парсинг документов, поиск базы знаний, ограничения памяти и экспорт PDF.
+
+## Сборка Windows EXE
+
+Однофайловая сборка описана в `quart.spec`:
+
+```powershell
+uv sync --extra build
+uv run pyinstaller --noconfirm --clean quart.spec
+```
+
+Результат создаётся в `dist/SC-Reports.exe`. Рядом с EXE должен находиться рабочий `.env`; каталоги `uploads`, `reports`, `knowledge`, `chroma_db`, `data`, `logs` и `models` приложение создаёт или использует рядом с EXE. Модели LLM в EXE не включаются и остаются во внешнем каталоге `models`.
 
 ## Локальные данные
 
