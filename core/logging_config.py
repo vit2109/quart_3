@@ -29,10 +29,14 @@ def setup_logging():
     console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
     
-    # Файловый хендлер (если указан)
-    if settings.LOG_FILE:
+    # В EXE журнал обязателен: консоль может быть закрыта, а диагностическое
+    # сообщение индексации иначе будет потеряно.
+    log_file = settings.LOG_FILE
+    if getattr(sys, "frozen", False) and not log_file:
+        log_file = str(log_dir / "app.log")
+    if log_file:
         file_handler = RotatingFileHandler(
-            settings.LOG_FILE,
+            log_file,
             maxBytes=10_485_760,  # 10MB
             backupCount=5,
             encoding='utf-8'

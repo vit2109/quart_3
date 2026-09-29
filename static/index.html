@@ -118,6 +118,10 @@
               <span>Описание</span>
               <input type="text" name="description" placeholder="Опционально" />
             </label>
+            <label id="uploadSheetField" hidden>
+              <span>Лист Excel</span>
+              <select name="sheet" id="uploadSheet"></select>
+            </label>
           </div>
           <div class="actions-row">
             <button type="submit" class="btn btn-primary" id="uploadBtn">Загрузить</button>
@@ -181,6 +185,16 @@
               <label>
                 <span>Имя результата</span>
                 <input type="text" name="name" placeholder="Join result" />
+              </label>
+            </div>
+            <div class="field-row">
+              <label id="joinLeftSheetField" hidden>
+                <span>Лист слева</span>
+                <select name="left_sheet" id="joinLeftSheet"></select>
+              </label>
+              <label id="joinRightSheetField" hidden>
+                <span>Лист справа</span>
+                <select name="right_sheet" id="joinRightSheet"></select>
               </label>
             </div>
             <div class="actions-row">

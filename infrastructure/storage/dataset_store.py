@@ -115,6 +115,19 @@ def get_dataset_path(dataset_id: int) -> Optional[Path]:
     return path if path.exists() else None
 
 
+def get_selected_sheet_for_path(path: Path) -> Optional[str]:
+    """Найти выбранный лист Excel по физическому пути файла."""
+    try:
+        stored_as = path.resolve().name
+    except OSError:
+        stored_as = path.name
+    with _lock:
+        for item in _read_manifest():
+            if item.get("stored_as") == stored_as:
+                return item.get("selected_sheet")
+    return None
+
+
 def save_dataset(
     *,
     original_filename: str,
@@ -123,6 +136,8 @@ def save_dataset(
     description: Optional[str] = None,
     content_type: Optional[str] = None,
     allow_duplicate: bool = False,
+    sheet_names: Optional[List[str]] = None,
+    selected_sheet: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Сохранить новый набор данных.
 
@@ -174,6 +189,9 @@ def save_dataset(
             "created_at": now,
             "updated_at": now,
         }
+        if sheet_names:
+            record["sheet_names"] = list(sheet_names)
+            record["selected_sheet"] = selected_sheet or sheet_names[0]
         items.append(record)
         _write_manifest(items)
         return record

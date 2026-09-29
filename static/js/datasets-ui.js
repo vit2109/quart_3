@@ -374,6 +374,56 @@ export function populateJoinSelects(items) {
     if (state.selectedDatasetId) left.value = String(state.selectedDatasetId);
   }
   if (right) right.innerHTML = opts;
+  void refreshJoinSheetSelect("left");
+  void refreshJoinSheetSelect("right");
+}
+
+function isExcelFilename(name) {
+  return /\.xlsx?$/i.test(String(name || ""));
+}
+
+function fillSheetSelect(select, sheets, selected) {
+  select.innerHTML = sheets
+    .map((sheet) => `<option value="${escapeHtml(sheet)}">${escapeHtml(sheet)}</option>`)
+    .join("");
+  if (selected && sheets.includes(selected)) select.value = selected;
+}
+
+async function loadUploadSheets(file) {
+  const field = $("#uploadSheetField");
+  const select = $("#uploadSheet");
+  field.hidden = true;
+  select.innerHTML = "";
+  if (!file || !isExcelFilename(file.name)) return;
+  const body = new FormData();
+  body.append("file", file);
+  try {
+    const response = await api("/datasets/excel/sheets", { method: "POST", body });
+    const sheets = response?.data?.sheets || [];
+    fillSheetSelect(select, sheets, sheets[0]);
+    field.hidden = !sheets.length;
+  } catch (err) {
+    toast(`Не удалось прочитать листы Excel: ${err.message}`, true);
+  }
+}
+
+async function refreshJoinSheetSelect(side) {
+  const datasetSelect = $(`#join${side === "left" ? "Left" : "Right"}Id`);
+  const sheetSelect = $(`#join${side === "left" ? "Left" : "Right"}Sheet`);
+  const field = $(`#join${side === "left" ? "Left" : "Right"}SheetField`);
+  if (!datasetSelect || !sheetSelect || !field) return;
+  field.hidden = true;
+  sheetSelect.innerHTML = "";
+  const dataset = state.datasetsCache.find((item) => item.id === Number(datasetSelect.value));
+  if (!dataset || !isExcelFilename(dataset.filename)) return;
+  try {
+    const response = await api(`/datasets/${dataset.id}/sheets`);
+    const sheets = response?.data?.sheets || [];
+    fillSheetSelect(sheetSelect, sheets, response?.data?.selected_sheet);
+    field.hidden = !sheets.length;
+  } catch (err) {
+    toast(`Не удалось загрузить листы набора #${dataset.id}: ${err.message}`, true);
+  }
 }
 
 export function setupDropzone() {
@@ -387,6 +437,7 @@ export function setupDropzone() {
     dt.items.add(file);
     input.files = dt.files;
     nameEl.textContent = file.name;
+    void loadUploadSheets(file);
   };
 
   zone.addEventListener("click", () => input.click());
@@ -397,7 +448,10 @@ export function setupDropzone() {
     }
   });
   input.addEventListener("change", () => {
-    if (input.files?.[0]) nameEl.textContent = input.files[0].name;
+    if (input.files?.[0]) {
+      nameEl.textContent = input.files[0].name;
+      void loadUploadSheets(input.files[0]);
+    }
   });
 
   ["dragenter", "dragover"].forEach((ev) => {
@@ -444,6 +498,8 @@ export function setupDatasets() {
     const description = form.description.value.trim();
     if (name) body.append("name", name);
     if (description) body.append("description", description);
+    const sheet = $("#uploadSheet")?.value;
+    if (sheet) body.append("sheet", sheet);
 
     const btn = $("#uploadBtn");
     btn.disabled = true;
@@ -454,6 +510,7 @@ export function setupDatasets() {
       toast(created?.name ? `Загружено: ${created.name}` : "Файл загружен");
       form.reset();
       $("#fileName").textContent = "Файл не выбран";
+      $("#uploadSheetField").hidden = true;
       await loadDatasets();
     } catch (err) {
       const dup = err.details?.existing_id;
@@ -468,6 +525,8 @@ export function setupDatasets() {
   });
 
   $("#refreshDatasets").addEventListener("click", () => loadDatasets());
+  $("#joinLeftId")?.addEventListener("change", () => refreshJoinSheetSelect("left"));
+  $("#joinRightId")?.addEventListener("change", () => refreshJoinSheetSelect("right"));
 
   $("#datasetList").addEventListener("click", async (e) => {
     const selectBtn = e.target.closest("[data-select]");
@@ -544,6 +603,8 @@ export function setupDatasets() {
       right_on: [String(fd.get("right_on") || "").trim()],
       how: String(fd.get("how") || "inner"),
       name: String(fd.get("name") || "").trim() || null,
+      left_sheet: String(fd.get("left_sheet") || "").trim() || null,
+      right_sheet: String(fd.get("right_sheet") || "").trim() || null,
     };
     const out = $("#joinOutput");
     setResultMessage(out, "Join и сохранение…");
@@ -575,6 +636,8 @@ export function setupDatasets() {
       right_on: [String(fd.get("right_on") || "").trim()],
       how: String(fd.get("how") || "inner"),
       sample: 15,
+      left_sheet: String(fd.get("left_sheet") || "").trim() || null,
+      right_sheet: String(fd.get("right_sheet") || "").trim() || null,
     };
     const out = $("#joinOutput");
     setResultMessage(out, "Preview join…");

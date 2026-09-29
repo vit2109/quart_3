@@ -12,20 +12,20 @@ import polars as pl
 from core.config import settings
 
 _lock = threading.RLock()
-_cache: Dict[Tuple[str, int, int], Tuple[float, pl.DataFrame]] = {}
+_cache: Dict[Tuple[str, int, int, str], Tuple[float, pl.DataFrame]] = {}
 
 
-def _cache_key(path: Path) -> Tuple[str, int, int]:
+def _cache_key(path: Path, variant: str = "") -> Tuple[str, int, int, str]:
     resolved = path.resolve()
     stat = resolved.stat()
-    return (str(resolved), stat.st_mtime_ns, stat.st_size)
+    return (str(resolved), stat.st_mtime_ns, stat.st_size, variant)
 
 
-def get_cached(path: Path) -> pl.DataFrame | None:
+def get_cached(path: Path, variant: str = "") -> pl.DataFrame | None:
     """Вернуть кэшированный DataFrame или None."""
     if not path.exists():
         return None
-    key = _cache_key(path)
+    key = _cache_key(path, variant)
     ttl = max(int(getattr(settings, "DATAFRAME_CACHE_TTL", 600)), 60)
     now = time.monotonic()
     with _lock:
@@ -35,11 +35,11 @@ def get_cached(path: Path) -> pl.DataFrame | None:
     return None
 
 
-def put_cached(path: Path, df: pl.DataFrame) -> None:
+def put_cached(path: Path, df: pl.DataFrame, variant: str = "") -> None:
     """Сохранить DataFrame в кэш."""
     if not path.exists():
         return
-    key = _cache_key(path)
+    key = _cache_key(path, variant)
     now = time.monotonic()
     with _lock:
         _cache[key] = (now, df)

@@ -78,7 +78,9 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # Сжатие нативных библиотек torch/tokenizers/Chroma может повреждать DLL
+    # и проявляется именно при первой индексации.
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=True,

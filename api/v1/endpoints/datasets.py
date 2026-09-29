@@ -9,7 +9,7 @@ from api.deps import AnalystDep, ViewerDep
 from core.config import settings
 from core.exceptions import AppException, DuplicateError, NotFoundError
 from infrastructure.storage import dataset_store
-from infrastructure.storage.schema_reader import get_columns
+from infrastructure.storage.schema_reader import get_columns, get_excel_sheet_names
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
 
@@ -21,6 +21,8 @@ class JoinPreviewRequest(BaseModel):
     right_on: List[str] = Field(default_factory=list)
     how: str = "inner"
     sample: int = Field(default=20, ge=1, le=200)
+    left_sheet: Optional[str] = None
+    right_sheet: Optional[str] = None
 
 
 class JoinSaveRequest(JoinPreviewRequest):
@@ -41,6 +43,8 @@ async def preview_join(body: JoinPreviewRequest, _user: AnalystDep):
             body.right_on,
             how=body.how,
             limit=body.sample,
+            left_sheet=body.left_sheet,
+            right_sheet=body.right_sheet,
         )
         return {"status": "success", "data": data}
     except AppException:
@@ -63,6 +67,8 @@ async def join_datasets(body: JoinSaveRequest, _user: AnalystDep):
             body.right_on,
             how=body.how,
             name=body.name,
+            left_sheet=body.left_sheet,
+            right_sheet=body.right_sheet,
         )
         return {"status": "success", "data": data}
     except AppException:
@@ -77,6 +83,7 @@ async def upload_dataset(
     file: UploadFile = File(...),
     name: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
+    sheet: Optional[str] = Form(None),
 ):
     """Загрузка нового набора данных.
 
@@ -93,12 +100,18 @@ async def upload_dataset(
         )
 
     try:
+        suffix = (file.filename or "").lower()
+        sheet_names = get_excel_sheet_names(content) if suffix.endswith((".xlsx", ".xls")) else None
+        if sheet and sheet_names and sheet not in sheet_names:
+            raise ValueError(f"Excel sheet '{sheet}' not found")
         record = dataset_store.save_dataset(
             original_filename=file.filename or "dataset.bin",
             content=content,
             name=name,
             description=description,
             content_type=file.content_type,
+            sheet_names=sheet_names,
+            selected_sheet=sheet,
         )
     except DuplicateError as e:
         raise HTTPException(status_code=409, detail=e.message, headers=None) from e
@@ -109,6 +122,43 @@ async def upload_dataset(
         "status": "success",
         "message": "Dataset uploaded",
         "data": record,
+    }
+
+
+@router.post("/excel/sheets")
+async def inspect_excel_sheets(_user: AnalystDep, file: UploadFile = File(...)):
+    """Прочитать список листов до сохранения Excel-файла."""
+    filename = file.filename or ""
+    if not filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="File must be XLSX or XLS")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty file")
+    try:
+        sheets = get_excel_sheet_names(content)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"status": "success", "data": {"sheets": sheets}}
+
+
+@router.get("/{dataset_id}/sheets")
+async def get_dataset_sheets(dataset_id: int, _user: ViewerDep):
+    """Список листов сохранённого Excel-набора."""
+    item = dataset_store.get_dataset(dataset_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    path = dataset_store.get_dataset_path(dataset_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Dataset file not found")
+    if path.suffix.lower() not in {".xlsx", ".xls"}:
+        return {"status": "success", "data": {"sheets": [], "selected_sheet": None}}
+    try:
+        sheets = item.get("sheet_names") or get_excel_sheet_names(path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "status": "success",
+        "data": {"sheets": sheets, "selected_sheet": item.get("selected_sheet") or sheets[0]},
     }
 
 

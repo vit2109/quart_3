@@ -11,6 +11,15 @@ if getattr(sys, "frozen", False):
 
 import core.env_bootstrap  # noqa: E402,F401 — до torch/transformers
 
+# PyInstaller запускает тот же EXE для изолированной индексации. Обработать этот
+# режим до импорта FastAPI, БД и планировщика, чтобы рабочий процесс оставался
+# лёгким и не запускал второй HTTP-сервер.
+if getattr(sys, "frozen", False) and "--knowledge-index-worker" in sys.argv:
+    sys.argv.remove("--knowledge-index-worker")
+    from infrastructure.knowledge.index_worker import main as _index_worker_main
+
+    raise SystemExit(_index_worker_main())
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles

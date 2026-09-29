@@ -28,6 +28,8 @@ class DatasetJoinService:
         right_on: Union[str, List[str]],
         how: str = "inner",
         limit: int = 20,
+        left_sheet: Optional[str] = None,
+        right_sheet: Optional[str] = None,
     ) -> Dict[str, Any]:
         return await asyncio.to_thread(
             self._preview_blocking,
@@ -37,6 +39,8 @@ class DatasetJoinService:
             right_on,
             how,
             limit,
+            left_sheet,
+            right_sheet,
         )
 
     async def join_and_save(
@@ -47,6 +51,8 @@ class DatasetJoinService:
         right_on: Union[str, List[str]],
         how: str = "inner",
         name: Optional[str] = None,
+        left_sheet: Optional[str] = None,
+        right_sheet: Optional[str] = None,
     ) -> Dict[str, Any]:
         return await asyncio.to_thread(
             self._join_and_save_blocking,
@@ -56,10 +62,13 @@ class DatasetJoinService:
             right_on,
             how,
             name,
+            left_sheet,
+            right_sheet,
         )
 
     def _load_pair(
-        self, left_id: int, right_id: int
+        self, left_id: int, right_id: int, left_sheet: Optional[str] = None,
+        right_sheet: Optional[str] = None,
     ) -> tuple[pl.DataFrame, pl.DataFrame, Dict[str, Any], Dict[str, Any]]:
         if left_id == right_id:
             raise ValidationError("left_id and right_id must differ")
@@ -74,8 +83,8 @@ class DatasetJoinService:
         if not left_path or not right_path:
             raise NotFoundError("Dataset file not found")
         return (
-            read_dataframe(left_path),
-            read_dataframe(right_path),
+            read_dataframe(left_path, sheet_name=left_sheet),
+            read_dataframe(right_path, sheet_name=right_sheet),
             left_meta,
             right_meta,
         )
@@ -130,8 +139,10 @@ class DatasetJoinService:
         right_on: Union[str, List[str]],
         how: str,
         limit: int,
+        left_sheet: Optional[str],
+        right_sheet: Optional[str],
     ) -> Dict[str, Any]:
-        left, right, lmeta, rmeta = self._load_pair(left_id, right_id)
+        left, right, lmeta, rmeta = self._load_pair(left_id, right_id, left_sheet, right_sheet)
         joined = self._join_df(
             left, right, self._normalize_keys(left_on), self._normalize_keys(right_on), how
         )
@@ -145,6 +156,8 @@ class DatasetJoinService:
             "how": how,
             "left_on": self._normalize_keys(left_on),
             "right_on": self._normalize_keys(right_on),
+            "left_sheet": left_sheet or lmeta.get("selected_sheet"),
+            "right_sheet": right_sheet or rmeta.get("selected_sheet"),
             "left_rows": left.height,
             "right_rows": right.height,
             "joined_rows": joined.height,
@@ -163,8 +176,10 @@ class DatasetJoinService:
         right_on: Union[str, List[str]],
         how: str,
         name: Optional[str],
+        left_sheet: Optional[str],
+        right_sheet: Optional[str],
     ) -> Dict[str, Any]:
-        left, right, lmeta, rmeta = self._load_pair(left_id, right_id)
+        left, right, lmeta, rmeta = self._load_pair(left_id, right_id, left_sheet, right_sheet)
         joined = self._join_df(
             left, right, self._normalize_keys(left_on), self._normalize_keys(right_on), how
         )
@@ -182,6 +197,8 @@ class DatasetJoinService:
             "left_on": self._normalize_keys(left_on),
             "right_on": self._normalize_keys(right_on),
             "how": how,
+            "left_sheet": left_sheet or lmeta.get("selected_sheet"),
+            "right_sheet": right_sheet or rmeta.get("selected_sheet"),
         }
         default_name = f"{lmeta.get('name', left_id)} ⋈ {rmeta.get('name', right_id)}"
         record = dataset_store.save_dataset(

@@ -100,9 +100,7 @@ class KnowledgeService:
     def _index_document_by_id(
         self, document_id: str, collection: str
     ) -> Dict[str, Any]:
-        # В one-file EXE sys.executable указывает на само приложение,
-        # поэтому `exe -m index_worker` недоступен.
-        if settings.KNOWLEDGE_USE_SUBPROCESS and not getattr(sys, "frozen", False):
+        if settings.KNOWLEDGE_USE_SUBPROCESS:
             return self._index_via_subprocess(document_id, collection)
         return self.index_document_inprocess(document_id, collection=collection)
 
@@ -118,14 +116,23 @@ class KnowledgeService:
                 int(settings.KNOWLEDGE_MIN_FREE_RAM_MB or 0),
                 operation="запуска индексации",
             )
-            cmd = [
-                sys.executable,
-                "-m",
-                "infrastructure.knowledge.index_worker",
-                document_id,
-                "--collection",
-                collection,
-            ]
+            if getattr(sys, "frozen", False):
+                cmd = [
+                    sys.executable,
+                    "--knowledge-index-worker",
+                    document_id,
+                    "--collection",
+                    collection,
+                ]
+            else:
+                cmd = [
+                    sys.executable,
+                    "-m",
+                    "infrastructure.knowledge.index_worker",
+                    document_id,
+                    "--collection",
+                    collection,
+                ]
             timeout = max(60, int(settings.KNOWLEDGE_SUBPROCESS_TIMEOUT or 3600))
             logger.info("Starting index subprocess: %s", " ".join(cmd))
             proc = subprocess.run(
