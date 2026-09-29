@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>СЦ-аналитика</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="СЦ-аналитика">
+      <span class="brand-name">СЦ-аналитика</span>
+    </a>
+    <nav class="top-nav" aria-label="Разделы">
+      <button type="button" class="nav-link is-active" data-panel="datasets">Данные</button>
+      <button type="button" class="nav-link" data-panel="analysis">Анализ</button>
+      <button type="button" class="nav-link" data-panel="reports">Отчёты</button>
+      <button type="button" class="nav-link" data-panel="knowledge">База знаний</button>
+    </nav>
+    <div class="topbar-actions">
+      <div class="dataset-context" id="globalDatasetContext" title="Активный набор для ETL, анализа и отчётов">
+        <label class="dataset-context-label">
+          <span>Набор</span>
+          <select id="globalDatasetSelect" aria-label="Активный набор данных">
+            <option value="">— загрузка —</option>
+          </select>
+        </label>
+        <span class="dataset-context-meta" id="globalDatasetMeta"></span>
+        <button type="button" class="btn btn-ghost btn-sm" id="copyFiltersAll" title="Скопировать фильтры текущей вкладки на остальные">Копировать фильтры</button>
+        <span class="filter-badge" id="activeFiltersBadge" hidden title="Число активных фильтров"></span>
+      </div>
+      <span class="status-dot" id="apiStatus" title="API">API</span>
+      <button type="button" class="btn btn-ghost" id="openAuth" aria-expanded="false">Вход</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <aside class="auth-drawer" id="authDrawer" hidden>
+      <div class="drawer-head">
+        <h2>Доступ</h2>
+        <button type="button" class="icon-btn" id="closeAuth" aria-label="Закрыть">×</button>
+      </div>
+      <div class="auth-session" id="authSession" hidden>
+        <p class="auth-user-line"><strong id="authUserEmail">—</strong></p>
+        <p class="meta" id="authUserRole">—</p>
+        <button type="button" class="btn btn-secondary btn-block" id="logoutBtn">Выйти</button>
+      </div>
+      <div id="authForms">
+        <div class="auth-tabs" role="tablist">
+          <button type="button" class="auth-tab is-active" data-auth-tab="login" role="tab">Вход</button>
+          <button type="button" class="auth-tab" data-auth-tab="register" role="tab">Регистрация</button>
+        </div>
+        <form id="loginForm" class="stack-form auth-panel" data-auth-panel="login">
+          <label>
+            <span>Email</span>
+            <input type="email" name="email" required placeholder="analyst@quart.io" autocomplete="username" />
+          </label>
+          <label>
+            <span>Пароль</span>
+            <input type="password" name="password" required placeholder="••••••••" autocomplete="current-password" />
+          </label>
+          <button type="submit" class="btn btn-primary btn-block">Войти</button>
+        </form>
+        <form id="registerForm" class="stack-form auth-panel" data-auth-panel="register" hidden>
+          <label>
+            <span>Email</span>
+            <input type="email" name="email" required placeholder="user@example.com" autocomplete="email" />
+          </label>
+          <label>
+            <span>Имя пользователя</span>
+            <input type="text" name="username" required placeholder="analyst" minlength="2" />
+          </label>
+          <label>
+            <span>Полное имя</span>
+            <input type="text" name="full_name" placeholder="Необязательно" />
+          </label>
+          <label>
+            <span>Пароль</span>
+            <input type="password" name="password" required minlength="6" placeholder="мин. 6 символов" autocomplete="new-password" />
+          </label>
+          <button type="submit" class="btn btn-primary btn-block">Зарегистрироваться</button>
+        </form>
+      </div>
+      <p class="drawer-note">Учётные записи создаёт администратор. При первом запуске доступен вход admin / analyst (см. документацию).</p>
+    </aside>
+
+    <nav class="workflow-strip" aria-label="Пайплайн аналитики">
+      <button type="button" class="workflow-step" data-panel="datasets"><span>1</span> Данные</button>
+      <button type="button" class="workflow-step" data-panel="analysis"><span>2</span> Анализ</button>
+      <button type="button" class="workflow-step" data-panel="reports"><span>3</span> Отчёты</button>
+      <button type="button" class="workflow-step" data-panel="knowledge"><span>4</span> База знаний</button>
+    </nav>
+
+    <div class="workspace">
+      <!-- Datasets -->
+      <section class="panel is-active" id="panel-datasets" aria-labelledby="datasets-heading">
+        <header class="panel-head">
+          <h2 id="datasets-heading">Данные</h2>
+          <p>Загрузка CSV, Excel, JSON или Parquet, паспорт набора, join и подготовка (ETL).</p>
+        </header>
+
+        <form id="uploadForm" class="control-surface upload-surface">
+          <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Выбрать файл">
+            <input type="file" id="fileInput" name="file" accept=".csv,.xlsx,.xls,.json,.parquet" hidden />
+            <p class="dropzone-title">Перетащите файл сюда</p>
+            <p class="dropzone-hint">или нажмите, чтобы выбрать · до 100 МБ</p>
+            <p class="dropzone-file" id="fileName">Файл не выбран</p>
+          </div>
+          <div class="field-row">
+            <label>
+              <span>Название</span>
+              <input type="text" name="name" placeholder="Продажи Q1" />
+            </label>
+            <label>
+              <span>Описание</span>
+              <input type="text" name="description" placeholder="Опционально" />
+            </label>
+          </div>
+          <div class="actions-row">
+            <button type="submit" class="btn btn-primary" id="uploadBtn">Загрузить</button>
+            <button type="button" class="btn btn-secondary" id="refreshDatasets">Обновить список</button>
+          </div>
+        </form>
+
+        <div class="list-block">
+          <div class="list-head">
+            <h3>Доступные наборы</h3>
+            <span class="meta" id="datasetCount">0</span>
+          </div>
+          <ul class="data-list" id="datasetList">
+            <li class="empty">Загрузка…</li>
+          </ul>
+        </div>
+
+        <div class="list-block dataset-passport" id="datasetPassport" hidden>
+          <div class="list-head">
+            <h3>Паспорт набора</h3>
+            <span class="meta" id="passportMeta"></span>
+          </div>
+          <div id="datasetPassportBody">
+            <p class="result-placeholder">Выберите набор в списке</p>
+          </div>
+        </div>
+
+        <div class="list-block">
+          <div class="list-head">
+            <h3>Join наборов</h3>
+          </div>
+          <form id="joinForm" class="control-surface stack-form">
+            <div class="field-row">
+              <label>
+                <span>Левый набор</span>
+                <select name="left_id" id="joinLeftId"></select>
+              </label>
+              <label>
+                <span>Правый набор</span>
+                <select name="right_id" id="joinRightId"></select>
+              </label>
+              <label>
+                <span>Тип join</span>
+                <select name="how">
+                  <option value="inner">inner</option>
+                  <option value="left">left</option>
+                  <option value="right">right</option>
+                  <option value="full">full</option>
+                </select>
+              </label>
+            </div>
+            <div class="field-row">
+              <label>
+                <span>Ключ слева</span>
+                <input type="text" name="left_on" placeholder="region" required />
+              </label>
+              <label>
+                <span>Ключ справа</span>
+                <input type="text" name="right_on" placeholder="region" required />
+              </label>
+              <label>
+                <span>Имя результата</span>
+                <input type="text" name="name" placeholder="Join result" />
+              </label>
+            </div>
+            <div class="actions-row">
+              <button type="button" class="btn btn-secondary" id="previewJoin">Preview</button>
+              <button type="submit" class="btn btn-primary">Сохранить join</button>
+            </div>
+          </form>
+          <div id="joinOutput" class="result-panel compact">
+            <p class="result-placeholder">Укажите два набора и ключи join.</p>
+          </div>
+        </div>
+
+        <dialog class="modal" id="editDatasetModal">
+          <form id="editDatasetForm" method="dialog" class="stack-form">
+            <div class="drawer-head">
+              <h3>Редактировать набор</h3>
+              <button type="button" class="icon-btn" id="closeEditModal" aria-label="Закрыть">×</button>
+            </div>
+            <input type="hidden" name="dataset_id" id="editDatasetId" />
+            <label>
+              <span>Название</span>
+              <input type="text" name="name" id="editDatasetName" required />
+            </label>
+            <label>
+              <span>Описание</span>
+              <input type="text" name="description" id="editDatasetDescription" />
+            </label>
+            <label>
+              <span>Заменить файл (опционально)</span>
+              <input type="file" name="file" id="editDatasetFile" accept=".csv,.xlsx,.xls,.json,.parquet" />
+            </label>
+            <div class="actions-row">
+              <button type="submit" class="btn btn-primary">Сохранить</button>
+              <button type="button" class="btn btn-secondary" id="cancelEditModal">Отмена</button>
+            </div>
+          </form>
+        </dialog>
+
+        <details class="workspace-section" id="etlSection">
+          <summary>
+            <span>Подготовка данных (ETL)</span>
+            <small>пропуски, дубликаты, нормализация строк, выбросы</small>
+          </summary>
+          <div class="workspace-section-body">
+        <form id="etlForm" class="control-surface">
+          <p class="active-dataset-bar">Активный набор: <strong class="active-dataset-label">—</strong></p>
+          <input type="hidden" name="dataset_id" id="etlDatasetId" value="1" />
+          <div class="toggle-grid">
+            <label class="toggle">
+              <input type="checkbox" name="clean_missing" checked />
+              <span class="toggle-ui"></span>
+              <span class="toggle-copy">
+                <strong>Пропуски</strong>
+                <small>Заполнить или удалить missing-значения</small>
+              </span>
+            </label>
+          </div>
+          <label>
+            <span>Стратегия пропусков</span>
+            <select name="missing_strategy" id="etlMissingStrategy">
+              <option value="drop">Удалить строки (drop)</option>
+              <option value="fill_zero">Заполнить 0 (числа)</option>
+              <option value="fill_mean">Заполнить средним</option>
+              <option value="fill_median">Заполнить медианой</option>
+              <option value="fill_unknown">Unknown / 0</option>
+              <option value="forward_fill">Forward-fill (даты/ряды)</option>
+            </select>
+          </label>
+          <div class="toggle-grid">
+            <label class="toggle">
+              <input type="checkbox" name="remove_duplicates" checked />
+              <span class="toggle-ui"></span>
+              <span class="toggle-copy">
+                <strong>Дубликаты</strong>
+                <small>Удалить повторяющиеся строки</small>
+              </span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" name="normalize_strings" checked />
+              <span class="toggle-ui"></span>
+              <span class="toggle-copy">
+                <strong>Строки</strong>
+                <small>Нормализация регистра и пробелов</small>
+              </span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" name="remove_outliers" />
+              <span class="toggle-ui"></span>
+              <span class="toggle-copy">
+                <strong>Выбросы</strong>
+                <small>Отфильтровать аномальные значения</small>
+              </span>
+            </label>
+          </div>
+
+          <div class="actions-row">
+            <button type="submit" class="btn btn-primary">Запустить ETL</button>
+            <button type="button" class="btn btn-secondary" id="previewEtl">Preview diff</button>
+            <button type="button" class="btn btn-secondary" id="checkQuality">Проверить качество</button>
+          </div>
+        </form>
+
+        <div class="result-panel" id="etlOutput" aria-live="polite">
+          <p class="result-placeholder">Готово к запуску.</p>
+        </div>
+          </div>
+        </details>
+      </section>
+
+      <!-- Analysis -->
+      <section class="panel" id="panel-analysis" aria-labelledby="analysis-heading" hidden>
+        <header class="panel-head">
+          <h2 id="analysis-heading">Анализ</h2>
+          <p>Сводки, динамика, качество данных и AI — в одном месте. Выберите задачу, настройте фильтры и запустите расчёт.</p>
+        </header>
+
+        <form id="analysisForm" class="control-surface">
+          <p class="active-dataset-bar">Активный набор: <strong class="active-dataset-label">—</strong></p>
+          <input type="hidden" name="dataset_id" id="analysisDatasetId" value="1" />
+          <input type="hidden" name="method" id="analysisMethod" value="explore" />
+          <p class="analysis-help-bar">Выберите метод анализа. Нажмите <span class="help-btn help-btn-inline" aria-hidden="true">?</span> для развёрнутой справки.</p>
+          <div class="method-groups" id="analysisMethodGroups" role="tablist" aria-label="Задача анализа">
+            <div class="method-group">
+              <span class="method-group-label">Обзор</span>
+              <div class="method-chips">
+                <span class="method-chip-wrap"><button type="button" class="method-chip is-active" data-method="explore">Таблица и сводки</button><button type="button" class="help-btn" data-help="explore" aria-label="Справка: таблица и сводки">?</button></span>
+                <span class="method-chip-wrap"><button type="button" class="method-chip" data-method="statistics">Статистика</button><button type="button" class="help-btn" data-help="statistics" aria-label="Справка: статистика">?</button></span>
+                <span class="method-chip-wrap"><button type="button" class="method-chip" data-method="kpis">KPI</button><button type="button" class="help-btn" data-help="kpis" aria-label="Справка: KPI">?</button></span>
+              </div>
+            </div>
+            <div class="method-group">
+              <span class="method-group-label">Динамика</span>
+              <div class="method-chips">
+                <span class="method-chip-wrap"><button type="button" class="method-chip" data-method="timeseries">Временной ряд</button><button type="button" class="help-btn" data-help="timeseries" aria-label="Справка: временной ряд">?</button></span>
+                <span class="method-chip-wrap"><button type="button" class="method-chip" data-method="compare">Сравнение периодов</button><button type="button" class="help-btn" data-help="compare" aria-label="Справка: сравнение периодов">?</button></span>
+                <span class="method-chip-wrap"><button type="button" class="method-chip" data-method="forecast">Прогноз</button><button type="button" class="help-btn" data-help="forecast" aria-label="Справка: прогноз">?</button></span>
+                <span class="method-chip-wrap"><button type="button" class="method-chip" data-method="pareto">Pareto / топ-N</button><button type="button" class="help-btn" data-help="pareto" aria-label="Справка: Pareto">?</button></span>
+              </div>
+            </div>
+            <div class="method-group">
+              <span class="method-group-label">Качество</span>
+              <div class="method-chips">
+                <span class="method-chip-wrap"><button type="button" class="method-chip" data-method="correlations">Корреляции</button><button type="button" class="help-btn" data-help="correlations" aria-label="Справка: корреляции">?</button></span>
+                <span class="method-chip-wrap"><button type="button" class="method-chip" data-method="anomalies">Аномалии</button><button type="button" class="help-btn" data-help="anomalies" aria-label="Справка: аномалии">?</button></span>
+              </div>
+            </div>
+            <div class="method-group">
+              <span class="method-group-label">AI</span>
+              <div class="method-chips">
+                <span class="method-chip-wrap"><button type="button" class="method-chip" data-method="ai">Развёрнутый анализ</button><button type="button" class="help-btn" data-help="ai" aria-label="Справка: AI-анализ">?</button></span>
+                <span class="method-chip-wrap"><button type="button" class="method-chip" data-method="nl-query">Вопрос к таблице</button><button type="button" class="help-btn" data-help="nl-query" aria-label="Справка: NL-запрос">?</button></span>
+                <span class="method-chip-wrap"><button type="button" class="method-chip" data-method="sql">SQL</button><button type="button" class="help-btn" data-help="sql" aria-label="Справка: SQL">?</button></span>
+              </div>
+            </div>
+          </div>
+          <div class="method-options" id="methodOptions">
+            <div id="opt-filters" hidden>
+              <div class="export-block">
+                <div class="field-label-row">
+                  <span>Фильтры данных</span>
+                  <span class="field-label-actions">
+                    <button type="button" class="help-btn" data-help="filters" aria-label="Справка: фильтры">?</button>
+                    <button type="button" class="linkish" id="addAnalysisFilter">+ Добавить фильтр</button>
+                  </span>
+                </div>
+                <p class="hint">Анализ выполняется только по строкам, прошедшим фильтрацию.</p>
+                <div class="export-filter-list" id="analysisFilterList">
+                  <p class="column-picker-empty">Нажмите «Добавить фильтр» для условия по колонке</p>
+                </div>
+              </div>
+            </div>
+
+            <div id="opt-explore" hidden>
+              <div class="field-row">
+                <label>
+                  <span>Режим</span>
+                  <select name="explore_mode" id="exploreMode">
+                    <option value="grouped">Группировка + агрегация</option>
+                    <option value="raw">Сырые строки</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Лимит строк</span>
+                  <input type="number" name="explore_limit" min="1" max="2000" value="200" />
+                </label>
+                <label>
+                  <span>Сортировка</span>
+                  <select name="explore_sort_by" id="exploreSortBy">
+                    <option value="">— без сортировки —</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Направление</span>
+                  <select name="explore_sort_dir">
+                    <option value="asc">По возрастанию</option>
+                    <option value="desc">По убыванию</option>
+                  </select>
+                </label>
+              </div>
+              <div id="exploreGroupedBlock">
+                <div class="field-label-row">
+                  <span>Поля группировки</span>
+                  <button type="button" class="linkish" id="clearAnalysisGroupBy">Сбросить</button>
+                </div>
+                <div class="column-picker" id="analysisGroupPicker" role="group" aria-label="Группировка">
+                  <p class="column-picker-empty">Выберите набор — поля подгрузятся</p>
+                </div>
+                <div class="field-label-row">
+                  <span>Агрегации по полям</span>
+                  <span class="field-label-actions">
+                    <button type="button" class="help-btn" data-help="aggregations" aria-label="Справка: агрегации">?</button>
+                    <button type="button" class="linkish" id="addAnalysisAgg">+ Добавить агрегацию</button>
+                  </span>
+                </div>
+                <div class="export-agg-list" id="analysisAggList">
+                  <p class="column-picker-empty">Добавьте поле и тип агрегации (sum, mean, min, max, count, n_unique)</p>
+                </div>
+              </div>
+              <div id="exploreRawBlock" hidden>
+                <div class="field-label-row">
+                  <span>Колонки для вывода</span>
+                  <button type="button" class="linkish" id="selectAllExploreColumns">Выбрать все</button>
+                </div>
+                <div class="column-picker" id="exploreColumnPicker" role="group" aria-label="Колонки">
+                  <p class="column-picker-empty">Выберите набор — колонки подгрузятся</p>
+                </div>
+              </div>
+              <fieldset class="chart-options">
+                <legend>График</legend>
+                <label class="column-chip">
+                  <input type="checkbox" name="explore_chart_enable" id="exploreChartEnable" />
+                  <span><strong>Построить график</strong><small>по результату</small></span>
+                </label>
+                <div class="field-row" id="exploreChartOptions" hidden>
+                  <label>
+                    <span>Тип</span>
+                    <select name="explore_chart_type">
+                      <option value="bar">Столбчатая</option>
+                      <option value="horizontal_bar">Горизонтальная</option>
+                      <option value="line">Линейная</option>
+                      <option value="pie">Круговая</option>
+                      <option value="doughnut">Кольцевая</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Ось категорий (X)</span>
+                    <select name="explore_chart_label" id="exploreChartLabel"></select>
+                  </label>
+                  <label>
+                    <span>Значения (Y)</span>
+                    <select name="explore_chart_value" id="exploreChartValue"></select>
+                  </label>
+                  <label>
+                    <span>Топ N на графике</span>
+                    <input type="number" name="explore_chart_top_n" min="3" max="100" value="20" />
+                  </label>
+                </div>
+              </fieldset>
+            </div>
+
+            <div id="opt-timeseries" hidden>
+              <div class="field-row">
+                <label>
+                  <span>Колонка даты</span>
+                  <select name="timeseries_date_col" id="timeseriesDateColSelect">
+                    <option value="">— выберите колонку —</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Гранулярность</span>
+                  <select name="timeseries_granularity">
+                    <option value="day">День</option>
+                    <option value="week">Неделя</option>
+                    <option value="month">Месяц</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Агрегация</span>
+                  <select name="timeseries_agg">
+                    <option value="sum">sum</option>
+                    <option value="mean">mean</option>
+                    <option value="min">min</option>
+                    <option value="max">max</option>
+                    <option value="count">count</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Лимит периодов</span>
+                  <input type="number" name="timeseries_limit" min="10" max="2000" value="500" />
+                </label>
+              </div>
+              <div class="field-label-row">
+                <span>Метрики (числовые поля)</span>
+              </div>
+              <div class="column-picker" id="timeseriesMetricPicker" role="group" aria-label="Метрики динамики">
+                <p class="column-picker-empty">Выберите набор — метрики подгрузятся</p>
+              </div>
+            </div>
+
+            <div id="opt-pareto" hidden>
+              <div class="field-row">
+                <label>
+                  <span>Метрика</span>
+                  <select name="pareto_metric" id="paretoMetricSelect">
+                    <option value="">— выберите —</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Агрегация</span>
+                  <select name="pareto_agg">
+                    <option value="sum">sum</option>
+                    <option value="mean">mean</option>
+                    <option value="count">count</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Топ N</span>
+                  <input type="number" name="pareto_top_n" min="5" max="100" value="20" />
+                </label>
+              </div>
+              <p class="hint">Выберите поле группировки выше (блок «Поля группировки»).</p>
+            </div>
+
+            <div id="opt-kpi-agg-list" hidden>
+              <div class="field-label-row">
+                <span>Агрегации по полям</span>
+                <button type="button" class="linkish" id="addKpiAgg">+ Добавить KPI</button>
+              </div>
+              <div class="export-agg-list" id="analysisKpiAggList">
+                <p class="column-picker-empty">Добавьте числовое поле и тип агрегации</p>
+              </div>
+            </div>
+
+            <div id="opt-columns">
+              <div class="field-label-row">
+                <span>Колонки</span>
+                <button type="button" class="linkish" id="selectAllColumns">Выбрать все</button>
+              </div>
+              <div class="column-picker" id="columnPicker" role="group" aria-label="Колонки датасета">
+                <p class="column-picker-empty">Выберите набор данных — колонки подгрузятся автоматически</p>
+              </div>
+            </div>
+            <div id="opt-corr-method" hidden>
+              <label>
+                <span class="field-label-row">
+                  <span>Тип корреляции</span>
+                  <button type="button" class="help-btn" data-help="correlations" aria-label="Справка: корреляции">?</button>
+                </span>
+                <select name="corr_method" id="corrMethodSelect">
+                  <option value="pearson">Пирсон (Pearson)</option>
+                  <option value="spearman">Спирмен (Spearman)</option>
+                </select>
+              </label>
+              <p class="hint corr-method-hint">
+                <button type="button" class="linkish" data-help="corr-pearson">Справка: Пирсон</button>
+                ·
+                <button type="button" class="linkish" data-help="corr-spearman">Справка: Спирмен</button>
+              </p>
+            </div>
+            <label id="opt-contamination" hidden>
+              <span class="field-label-row">
+                <span>Contamination (доля аномалий)</span>
+                <button type="button" class="help-btn" data-help="contamination" aria-label="Справка: contamination">?</button>
+              </span>
+              <input type="range" name="contamination" min="0.01" max="0.5" step="0.01" value="0.1" />
+              <output id="contaminationOut">0.10</output>
+            </label>
+            <div class="field-row" id="opt-forecast" hidden>
+              <label>
+                <span>Дата</span>
+                <select name="date_col" id="dateColSelect">
+                  <option value="">— выберите колонку —</option>
+                </select>
+              </label>
+              <label>
+                <span>Цель</span>
+                <select name="target_col" id="targetColSelect">
+                  <option value="">— выберите колонку —</option>
+                </select>
+              </label>
+              <label>
+                <span>Периоды</span>
+                <input type="number" name="periods" min="1" max="365" value="30" />
+              </label>
+            </div>
+            <div id="opt-compare" hidden>
+              <div class="field-row">
+                <label>
+                  <span>Колонка даты</span>
+                  <select name="compare_date_col" id="compareDateColSelect">
+                    <option value="">— выберите колонку —</option>
+                  </select>
+                </label>
+              </div>
+              <fieldset class="compare-periods">
+                <legend>Период A</legend>
+                <div class="field-row">
+                  <label>
+                    <span>С</span>
+                    <input type="date" name="period_a_from" />
+                  </label>
+                  <label>
+                    <span>По</span>
+                    <input type="date" name="period_a_to" />
+                  </label>
+                </div>
+              </fieldset>
+              <fieldset class="compare-periods">
+                <legend>Период B</legend>
+                <div class="field-row">
+                  <label>
+                    <span>С</span>
+                    <input type="date" name="period_b_from" />
+                  </label>
+                  <label>
+                    <span>По</span>
+                    <input type="date" name="period_b_to" />
+                  </label>
+                </div>
+              </fieldset>
+            </div>
+            <div id="opt-nl-query" hidden>
+              <label>
+                <span>Вопрос к таблице</span>
+                <textarea name="nl_question" rows="3" placeholder="Например: топ-5 регионов по сумме продаж"></textarea>
+              </label>
+              <label class="column-chip">
+                <input type="checkbox" name="nl_unified_knowledge" id="nlUnifiedKnowledge" />
+                <span><strong>+ База знаний</strong><small>сквозной контекст таблица + документы</small></span>
+              </label>
+              <p class="field-hint">LLM строит безопасный Polars-план (фильтры, группировки, агрегации).</p>
+            </div>
+            <div id="opt-ai" hidden>
+              <label>
+                <span class="field-label-row">
+                  <span>Модель LLM</span>
+                  <button type="button" class="help-btn" data-help="ai-model" aria-label="Справка: выбор модели">?</button>
+                </span>
+                <select name="ai_model_path" id="aiModelSelect">
+                  <option value="">По умолчанию (.env)</option>
+                </select>
+              </label>
+              <label>
+                <span>Фокус анализа (опционально)</span>
+                <textarea name="question" rows="3" placeholder="Например: сравни регионы по входящим вызовам и потерянным звонкам, выдели риски и рекомендации"></textarea>
+              </label>
+              <label class="column-chip">
+                <input type="checkbox" name="ai_unified_knowledge" id="aiUnifiedKnowledge" />
+                <span><strong>+ База знаний</strong><small>объединить таблицу и RAG в одном ответе</small></span>
+              </label>
+              <p class="field-hint" id="aiHealthHint">Локальная LLM: проверка…</p>
+            </div>
+            <div id="opt-sql" hidden>
+              <label>
+                <span>SQL (только SELECT)</span>
+                <textarea name="sql_query" id="analysisSql" rows="5" placeholder="SELECT * FROM ds LIMIT 50"></textarea>
+              </label>
+              <p class="hint">Таблица <code>ds</code> — активный набор. Для join добавьте второй alias ниже.</p>
+              <div class="field-row">
+                <label>
+                  <span>Доп. alias</span>
+                  <input type="text" name="sql_alias2" placeholder="ds2" />
+                </label>
+                <label>
+                  <span>Dataset ID</span>
+                  <input type="number" name="sql_dataset2" min="1" placeholder="ID второго набора" />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions-row">
+            <button type="submit" class="btn btn-primary" id="analysisSubmitBtn">Выполнить</button>
+          </div>
+        </form>
+
+        <div class="result-panel" id="analysisOutput" aria-live="polite">
+          <p class="result-placeholder">Выберите метод и запустите анализ.</p>
+        </div>
+      </section>
+
+      <!-- Reports -->
+      <section class="panel" id="panel-reports" aria-labelledby="reports-heading" hidden>
+        <header class="panel-head">
+          <h2 id="reports-heading">Отчёты</h2>
+          <p>Готовый пакет таблиц и графиков, история запросов и выгрузка строк в CSV / JSON / XLSX.</p>
+        </header>
+
+        <form id="reportForm" class="control-surface">
+          <p class="active-dataset-bar">Активный набор: <strong class="active-dataset-label">—</strong></p>
+          <input type="hidden" name="dataset_id" id="reportDatasetId" value="1" />
+          <div class="field-row">
+            <label>
+              <span>Шаблон отчёта</span>
+              <select id="reportTemplate">
+                <option value="">— без шаблона —</option>
+              </select>
+            </label>
+            <button type="button" class="btn btn-secondary btn-sm" id="applyReportTemplate">Применить</button>
+          </div>
+          <div class="field-row">
+            <label>
+              <span>Тип отчёта</span>
+              <select name="report_type">
+                <option value="summary">Краткий — обзор и топ</option>
+                <option value="full">Полный — корреляции и аномалии</option>
+                <option value="executive">Для руководства — сжатые выводы</option>
+              </select>
+            </label>
+            <label>
+              <span>Топ N</span>
+              <input type="number" name="top_n" min="3" max="50" value="10" />
+            </label>
+          </div>
+
+          <div class="field-label-row">
+            <span>Поля группировки</span>
+            <button type="button" class="linkish" id="clearReportGroupBy">Сбросить</button>
+          </div>
+          <div class="column-picker" id="reportGroupPicker" role="group" aria-label="Поля группировки">
+            <p class="column-picker-empty">Выберите набор — поля подгрузятся</p>
+          </div>
+
+          <div class="field-label-row">
+            <span>Метрики для агрегации</span>
+            <button type="button" class="linkish" id="selectAllReportMetrics">Выбрать все числовые</button>
+          </div>
+          <div class="column-picker" id="reportMetricPicker" role="group" aria-label="Метрики">
+            <p class="column-picker-empty">Числовые колонки появятся здесь</p>
+          </div>
+
+          <div class="export-block">
+            <div class="field-label-row">
+              <span>Фильтры данных</span>
+              <button type="button" class="linkish" id="addReportFilter">+ Добавить фильтр</button>
+            </div>
+            <p class="hint">Условия по типу поля: даты — диапазон (≥ и ≤), числа — сравнения, текст — содержит / список. Анализ только по отфильтрованным строкам.</p>
+            <div class="export-filter-list" id="reportFilterList">
+              <p class="column-picker-empty">Нажмите «Добавить фильтр» для условия по колонке</p>
+            </div>
+          </div>
+
+          <label>
+            <span>Метрика для графиков</span>
+            <select name="chart_metric" id="reportChartMetric">
+              <option value="">— авто —</option>
+            </select>
+          </label>
+
+          <div class="field-label-row">
+            <span>Типы графиков</span>
+          </div>
+          <div class="chart-type-grid" id="reportChartTypes">
+            <label class="column-chip"><input type="checkbox" name="chart_type" value="bar" checked /><span><strong>Столбчатая</strong><small>bar</small></span></label>
+            <label class="column-chip"><input type="checkbox" name="chart_type" value="horizontal_bar" /><span><strong>Горизонтальная</strong><small>bar</small></span></label>
+            <label class="column-chip"><input type="checkbox" name="chart_type" value="line" /><span><strong>Линейная</strong><small>line</small></span></label>
+            <label class="column-chip"><input type="checkbox" name="chart_type" value="pie" checked /><span><strong>Круговая</strong><small>pie</small></span></label>
+            <label class="column-chip"><input type="checkbox" name="chart_type" value="doughnut" /><span><strong>Кольцевая</strong><small>doughnut</small></span></label>
+            <label class="column-chip"><input type="checkbox" name="chart_type" value="histogram" checked /><span><strong>Гистограмма</strong><small>распределение</small></span></label>
+            <label class="column-chip"><input type="checkbox" name="chart_type" value="scatter" /><span><strong>Scatter</strong><small>две метрики</small></span></label>
+            <label class="column-chip"><input type="checkbox" name="chart_type" value="radar" /><span><strong>Radar</strong><small>сравнение</small></span></label>
+          </div>
+
+          <div class="actions-row">
+            <button type="submit" class="btn btn-primary">Сгенерировать</button>
+            <button type="button" class="btn btn-secondary" id="scheduleReportBtn">Запланировать (cron)</button>
+          </div>
+        </form>
+
+        <details class="collapsible-section report-history-section" id="reportHistorySection">
+          <summary>
+            <span>История запросов</span>
+            <span class="meta" id="reportCount">0</span>
+          </summary>
+          <div class="collapsible-body">
+            <div class="list-head report-history-actions">
+              <button type="button" class="linkish" id="refreshReports">Обновить</button>
+              <button type="button" class="linkish link-danger" id="clearReportHistory">Очистить всё</button>
+            </div>
+            <ul class="data-list" id="reportList"></ul>
+          </div>
+        </details>
+        <div class="report-toolbar" id="reportToolbar" hidden>
+          <span class="meta" id="reportToolbarTitle">Отчёт</span>
+          <div class="report-export-group">
+            <label class="export-format-label">
+              <span>Формат</span>
+              <select id="exportFormat">
+                <option value="json">JSON</option>
+                <option value="html">HTML</option>
+                <option value="csv">CSV</option>
+                <option value="pdf">PDF</option>
+              </select>
+            </label>
+            <button type="button" class="btn btn-secondary btn-sm" id="exportReport">Экспорт</button>
+          </div>
+        </div>
+        <div class="result-panel" id="reportOutput" aria-live="polite">
+          <p class="result-placeholder">Ожидание действия.</p>
+        </div>
+
+        <details class="workspace-section" id="exportSection">
+          <summary>
+            <span>Выгрузка строк</span>
+            <small>фильтры, группировка, CSV / JSON / XLSX</small>
+          </summary>
+          <div class="workspace-section-body">
+        <form id="exportForm" class="control-surface export-surface">
+          <p class="active-dataset-bar">Активный набор: <strong class="active-dataset-label">—</strong></p>
+          <input type="hidden" name="dataset_id" id="exportDatasetId" value="1" />
+          <div class="field-row">
+            <label>
+              <span>Режим</span>
+              <select name="mode" id="exportMode">
+                <option value="raw">Строки (raw)</option>
+                <option value="grouped">Группировка</option>
+              </select>
+            </label>
+            <label>
+              <span>Сортировка</span>
+              <select name="sort_by" id="exportSortBy">
+                <option value="">— без сортировки —</option>
+              </select>
+            </label>
+            <label>
+              <span>Направление</span>
+              <select name="sort_dir" id="exportSortDir">
+                <option value="asc">По возрастанию</option>
+                <option value="desc">По убыванию</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="export-block">
+            <div class="field-label-row">
+              <span>Фильтры</span>
+              <button type="button" class="linkish" id="addExportFilter">+ Добавить фильтр</button>
+            </div>
+            <div class="export-filter-list" id="exportFilterList">
+              <p class="column-picker-empty">Нажмите «Добавить фильтр» для условия по колонке</p>
+            </div>
+          </div>
+
+          <div class="export-block" id="exportGroupBlock" hidden>
+            <div class="field-label-row">
+              <span>Группировка</span>
+              <button type="button" class="linkish" id="clearExportGroupBy">Сбросить</button>
+            </div>
+            <div class="column-picker" id="exportGroupPicker" role="group" aria-label="Поля группировки">
+              <p class="column-picker-empty">Выберите набор — поля подгрузятся</p>
+            </div>
+
+            <div class="field-label-row">
+              <span>Агрегации</span>
+              <button type="button" class="linkish" id="addExportAgg">+ Добавить агрегацию</button>
+            </div>
+            <div class="export-agg-list" id="exportAggList">
+              <p class="column-picker-empty">По умолчанию — count; добавьте sum/mean/min/max</p>
+            </div>
+          </div>
+
+          <div class="export-block" id="exportColumnsBlock">
+            <div class="field-label-row">
+              <span>Колонки для отображения</span>
+              <button type="button" class="linkish" id="selectAllExportColumns">Выбрать все</button>
+            </div>
+            <div class="column-picker" id="exportColumnPicker" role="group" aria-label="Колонки экспорта">
+              <p class="column-picker-empty">Выберите набор — колонки подгрузятся</p>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label>
+              <span>Строк на странице</span>
+              <input type="number" name="limit" id="exportLimit" min="10" max="1000" value="100" />
+            </label>
+          </div>
+
+          <div class="actions-row">
+            <button type="submit" class="btn btn-primary">Применить</button>
+            <button type="button" class="btn btn-secondary" id="resetExportForm">Сбросить</button>
+            <button type="button" class="btn btn-secondary" id="exportDownloadCsv">CSV</button>
+            <button type="button" class="btn btn-secondary" id="exportDownloadJson">JSON</button>
+            <button type="button" class="btn btn-secondary" id="exportDownloadXlsx">XLSX</button>
+          </div>
+        </form>
+
+        <div class="export-meta" id="exportMeta" hidden></div>
+        <div class="export-pagination" id="exportPagination" hidden>
+          <button type="button" class="btn btn-secondary btn-sm" id="exportPrev">← Назад</button>
+          <span class="meta" id="exportPageInfo">Стр. 1</span>
+          <button type="button" class="btn btn-secondary btn-sm" id="exportNext">Вперёд →</button>
+        </div>
+        <div class="result-panel export-result" id="exportOutput" aria-live="polite">
+          <p class="result-placeholder">Настройте фильтры и нажмите «Применить».</p>
+        </div>
+          </div>
+        </details>
+      </section>
+
+      <!-- Knowledge / RAG -->
+      <section class="panel" id="panel-knowledge" aria-labelledby="knowledge-heading" hidden>
+        <header class="panel-head">
+          <h2 id="knowledge-heading">База знаний</h2>
+          <p>Текстовые и табличные документы → парсинг → векторная БД → гибридный поиск и офлайн AI.</p>
+        </header>
+
+        <div class="knowledge-stats" id="knowledgeStats">
+          <span class="meta">Загрузка статистики…</span>
+        </div>
+
+        <div class="knowledge-grid">
+          <article class="control-surface knowledge-card">
+            <h3>1. Индексация</h3>
+            <form id="knowledgeUploadForm" class="stack-form">
+              <div class="dropzone dropzone-sm" id="knowledgeDropzone" tabindex="0" role="button">
+                <input type="file" id="knowledgeFileInput" accept=".txt,.md,.docx,.pdf,.csv,.xlsx,.xls,.json" hidden />
+                <p class="dropzone-title">TXT, DOCX, PDF, CSV, XLSX…</p>
+                <p class="dropzone-file" id="knowledgeFileName">Файл не выбран</p>
+              </div>
+              <label><span>Название</span><input type="text" name="title" placeholder="Опционально" /></label>
+              <label><span>Описание</span><input type="text" name="description" placeholder="Опционально" /></label>
+              <label class="checkbox-inline">
+                <input type="checkbox" name="background" id="knowledgeBackground" checked />
+                <span>Фоновая индексация (рекомендуется — защита от перегрузки RAM)</span>
+              </label>
+              <p class="field-hint">Индексация выполняется в отдельном процессе (~500 МБ RAM). Не закрывайте сервер до завершения задачи.</p>
+              <button type="submit" class="btn btn-primary">Загрузить и проиндексировать</button>
+            </form>
+            <hr class="divider" />
+            <form id="knowledgeDatasetForm" class="field-row">
+              <p class="active-dataset-bar field-full">Индексировать активный табличный набор: <strong class="active-dataset-label">—</strong></p>
+              <input type="hidden" name="dataset_id" id="knowledgeDatasetId" value="1" />
+              <button type="submit" class="btn btn-secondary">Индексировать в базу знаний</button>
+            </form>
+          </article>
+
+          <article class="control-surface knowledge-card">
+            <h3>2. Поиск</h3>
+            <form id="knowledgeSearchForm" class="stack-form">
+              <label>
+                <span>Запрос</span>
+                <textarea name="query" rows="3" placeholder="Найди информацию о…" required></textarea>
+              </label>
+              <div class="field-row">
+                <label>
+                  <span>Искать в документе</span>
+                  <select id="knowledgeSearchDoc"><option value="">Во всей базе знаний</option></select>
+                </label>
+                <label>
+                  <span>Режим</span>
+                  <select name="mode" id="knowledgeSearchMode">
+                    <option value="hybrid">Гибридный (vector + keyword)</option>
+                    <option value="vector">Только семантика</option>
+                    <option value="keyword">Только текст</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Top K</span>
+                  <input type="number" name="top_k" min="1" max="20" value="6" />
+                </label>
+              </div>
+              <label class="toggle knowledge-llm-toggle">
+                <input type="checkbox" name="with_llm" id="knowledgeSearchWithLlm" />
+                <span class="toggle-ui"></span>
+                <span class="toggle-copy">
+                  <strong>Обработать LLM</strong>
+                  <small>Сначала поиск, затем ответ офлайн-модели по найденным фрагментам</small>
+                </span>
+              </label>
+              <div class="actions-row">
+                <button type="submit" class="btn btn-primary">Найти</button>
+              </div>
+            </form>
+            <div class="result-panel knowledge-result" id="knowledgeSearchOutput">
+              <p class="result-placeholder">Введите запрос и нажмите «Найти». Включите переключатель для ответа LLM.</p>
+            </div>
+          </article>
+        </div>
+
+        <article class="control-surface knowledge-admin">
+          <div class="list-head">
+            <h3>3. Управление векторной БД</h3>
+            <div class="actions-row">
+              <button type="button" class="btn btn-secondary btn-sm" id="repairChroma">Восстановить Chroma</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="refreshKnowledge">Обновить</button>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label>
+              <span>Фильтр документов</span>
+              <select id="knowledgeDocFilter"><option value="">Все документы</option></select>
+            </label>
+            <label>
+              <span>Поиск по фрагментам</span>
+              <input type="text" id="knowledgeChunkQuery" placeholder="Ключевые слова" />
+            </label>
+            <button type="button" class="btn btn-secondary btn-sm" id="knowledgeFilterBtn">Применить</button>
+          </div>
+
+          <div class="knowledge-admin-grid">
+            <div class="list-block">
+              <div class="list-head"><h4>Документы</h4></div>
+              <ul class="data-list" id="knowledgeDocList"></ul>
+            </div>
+            <div class="list-block">
+              <div class="list-head"><h4>Фрагменты (chunks)</h4><span class="meta" id="knowledgeChunkCount">0</span></div>
+              <ul class="data-list" id="knowledgeChunkList"></ul>
+            </div>
+          </div>
+        </article>
+
+        <dialog class="modal" id="editChunkModal">
+          <form id="editChunkForm" method="dialog" class="stack-form">
+            <div class="drawer-head">
+              <h3>Редактировать фрагмент</h3>
+              <button type="button" class="icon-btn" id="closeChunkModal" aria-label="Закрыть">×</button>
+            </div>
+            <input type="hidden" id="editChunkId" />
+            <label>
+              <span>Текст фрагмента</span>
+              <textarea id="editChunkText" rows="8" required></textarea>
+            </label>
+            <div class="actions-row">
+              <button type="submit" class="btn btn-primary">Сохранить</button>
+              <button type="button" class="btn btn-secondary" id="cancelChunkModal">Отмена</button>
+            </div>
+          </form>
+        </dialog>
+      </section>
+    </div>
+  </main>
+
+  <dialog class="help-modal" id="helpModal" aria-labelledby="helpModalTitle">
+    <div class="help-modal-inner">
+      <header class="help-modal-head">
+        <h3 id="helpModalTitle">Справка</h3>
+        <button type="button" class="icon-btn" id="helpModalClose" aria-label="Закрыть">×</button>
+      </header>
+      <article class="help-modal-body prose" id="helpModalBody"></article>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="/static/js/vendor/chart.umd.min.js"></script>
+  <script src="/static/js/analysis-views.js"></script>
+  <script src="/static/js/app.js" type="module"></script>
+  <script src="/static/js/knowledge.js" type="module"></script>
+</body>
+</html>

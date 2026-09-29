@@ -1,0 +1,26 @@
+# Python-generated files
+__pycache__/
+.pytest_cache/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+*.docx
+*.xlsx
+*.txt
+*.json
+
+# Virtual environments
+.venv
+.env
+
+# Uploads & local data
+uploads/
+data/
+reports/
+chroma_db/
+knowledge/
+logs/
+models/
+.docx_qa/
