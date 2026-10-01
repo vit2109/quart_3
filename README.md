@@ -79,10 +79,11 @@ uv run pytest -q
 
 ```powershell
 uv sync --extra build
+uv run python scripts/prepare_embedding_model.py
 uv run pyinstaller --noconfirm --clean quart.spec
 ```
 
-Результат создаётся в `dist/SC-Reports.exe`. Рядом с EXE должен находиться рабочий `.env`; каталоги `uploads`, `reports`, `knowledge`, `chroma_db`, `data`, `logs` и `models` приложение создаёт или использует рядом с EXE. Модели LLM в EXE не включаются и остаются во внешнем каталоге `models`.
+Результат создаётся в `dist/SC-Reports.exe`. Модель эмбеддингов для поиска по базе знаний включается в EXE и работает без сети. Рядом с EXE должен находиться рабочий `.env`; каталоги `uploads`, `reports`, `knowledge`, `chroma_db`, `data`, `logs` и `models` приложение создаёт или использует рядом с EXE. Модели LLM в EXE не включаются и остаются во внешнем каталоге `models`.
 
 ## Локальные данные
 

@@ -7,8 +7,15 @@ from PyInstaller.utils.hooks import collect_all, collect_submodules, copy_metada
 
 
 ROOT = Path(SPECPATH).resolve()
+EMBEDDING_MODEL_DIR = ROOT / "models" / "embedding" / "all-MiniLM-L6-v2"
+if not EMBEDDING_MODEL_DIR.is_dir():
+    raise SystemExit(
+        "Embedding model is missing. Run: "
+        ".venv\\Scripts\\python.exe scripts\\prepare_embedding_model.py"
+    )
 datas = [
     (str(ROOT / "static"), "static"),
+    (str(EMBEDDING_MODEL_DIR), "embedding_model"),
 ]
 binaries = []
 hiddenimports = [

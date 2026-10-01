@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import gc
 import logging
+from pathlib import Path
+import sys
 import threading
 import time
 from typing import List
@@ -31,7 +33,24 @@ def _load_model():
         device,
         threads if device == "cpu" else "n/a",
     )
-    return SentenceTransformer(settings.EMBEDDING_MODEL, device=device)
+    model_source: str | Path = settings.EMBEDDING_MODEL
+    local_only = False
+    if getattr(sys, "frozen", False):
+        bundled = Path(getattr(sys, "_MEIPASS", "")) / "embedding_model"
+        external = Path(settings.EMBEDDING_MODEL)
+        if bundled.is_dir():
+            model_source = bundled
+        elif external.is_dir():
+            model_source = external
+        else:
+            raise RuntimeError(
+                "Модель эмбеддингов не найдена в EXE. Пересоберите приложение "
+                "после запуска scripts/prepare_embedding_model.py."
+            )
+        local_only = True
+    return SentenceTransformer(
+        str(model_source), device=device, local_files_only=local_only
+    )
 
 
 def get_embedding_model():
